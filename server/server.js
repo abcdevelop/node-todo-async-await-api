@@ -11,13 +11,13 @@ var {User} = require('./models/user');
 var {authenticate} = require('./middleware/middleware');
 
 var app = express();
-var port=process.env.PORT;
+var port = process.env.PORT;
 
 app.use(bodyParser.json());
 
 //TODOS
 
-app.post('/todos',authenticate,(req,res)=>{
+app.post('/todos', authenticate, (req, res) => {
     //console.log(req.body);
     var todo = new Todo({
         text: req.body.text,
@@ -26,30 +26,31 @@ app.post('/todos',authenticate,(req,res)=>{
 
     todo.save().then((doc) => {
         res.send(doc);
-    },(e) => {
+    }, (e) => {
         res.status(400).send(e);
     });
 });
 
-app.get('/todos',authenticate,(req,res)=>{
+app.get('/todos', authenticate, (req, res) => {
     Todo.find({
         _creator: req.user._id
     }).then((todos) => {
         res.send({todos});
-    },(e) => {
+    }, (e) => {
         res.status(400).send(e);
     });
 });
 
-app.get('/todos/:id',authenticate,(req,res)=>{
+app.get('/todos/:id', authenticate, (req, res) => {
     //get the id
     var id = req.params.id;
 
     // Valid id using isValid
-    if(!ObjectID.isValid(id)){
+    if (!ObjectID.isValid(id)) {
         //404 - send back empty sent
-         return res.status(404).send();
-    };
+        return res.status(404).send();
+    }
+    ;
 
     // findById
     Todo.findOne({
@@ -58,7 +59,7 @@ app.get('/todos/:id',authenticate,(req,res)=>{
     }).then(
         // succes
         (todo) => {
-            if(!todo){
+            if (!todo) {
                 return res.status(404).send();
             }
             // if todo - sent it back
@@ -66,121 +67,168 @@ app.get('/todos/:id',authenticate,(req,res)=>{
         },
         // error
         (e) => {
-        // 400 - and send body back
-        res.status(400).send(e);
-    });
-});
-
-app.delete('/todos/:id',authenticate,(req,res)=>{
-    //get the id
-    var id = req.params.id;
-
-    // validate the id -> not valid ? return 404
-    if(!ObjectID.isValid(id)){
-        //404 - send back empty sent
-        return res.status(404).send();
-    };
-
-    //remove todo by id
-    Todo.findOneAndRemove({
-        _id: id,
-        _creator: req.user._id
-    }).then(
-        //succes
-        (todo)=>{
-            //if no doc, send 404
-            if(!todo){
-                return res.status(404).send();
-            }
-            //if doc send doc with 200
-            res.send({todo});
-        },
-        // error
-        (e) => {
-            //400 with empty body
+            // 400 - and send body back
             res.status(400).send(e);
-    });
+        });
 });
 
-app.patch('/todos/:id',authenticate,(req,res)=>{
-    var id = req.params.id;
-    var body = _.pick(req.body,['text','completed']);
+app.delete('/todos/:id', authenticate, async (req, res) => {
+    // //get the id
+    // var id = req.params.id;
+    //
+    // // validate the id -> not valid ? return 404
+    // if(!ObjectID.isValid(id)){
+    //     //404 - send back empty sent
+    //     return res.status(404).send();
+    // };
+    //
+    // //remove todo by id
+    // Todo.findOneAndRemove({
+    //     _id: id,
+    //     _creator: req.user._id
+    // }).then(
+    //     //succes
+    //     (todo)=>{
+    //         //if no doc, send 404
+    //         if(!todo){
+    //             return res.status(404).send();
+    //         }
+    //         //if doc send doc with 200
+    //         res.send({todo});
+    //     },
+    //     // error
+    //     (e) => {
+    //         //400 with empty body
+    //         res.status(400).send(e);
+    // });
 
-    if(!ObjectID.isValid(id)){
+    const id = req.params.id;
+    if (!ObjectID.isValid(id)) {
         return res.status(404).send();
-    };
+    }
 
-    if(_.isBoolean(body.completed) && body.completed){
+    try {
+        const todo = await Todo.findOneAndRemove({
+            _id: id,
+            _creator: req.user._id
+        });
+        if (!todo) {
+            return res.status(404).send();
+        }
+        res.send({todo});
+    } catch (e) {
+        res.status(400).send(e);
+    }
+
+});
+
+app.patch('/todos/:id', authenticate, (req, res) => {
+    var id = req.params.id;
+    var body = _.pick(req.body, ['text', 'completed']);
+
+    if (!ObjectID.isValid(id)) {
+        return res.status(404).send();
+    }
+    ;
+
+    if (_.isBoolean(body.completed) && body.completed) {
         body.completedAt = new Date().getTime();
-    }else{
+    } else {
         body.completed = false;
         body.completedAt = null;
     }
 
     Todo.findOneAndUpdate({
-        _id:id,
+        _id: id,
         _creator: req.user._id
-    },{$set:body},{new:true})
-        .then((todo)=>{
-            if(!todo){
+    }, {$set: body}, {new: true})
+        .then((todo) => {
+            if (!todo) {
                 return res.status(404).send();
             }
 
             res.send({todo});
-        }).catch((e)=>{
-            res.status(400).send()
-        });
+        }).catch((e) => {
+        res.status(400).send()
+    });
 
 });
 
 
 // USERS
 
-app.post('/users',(req,res)=>{
-    //console.log(req.body);
-    var body = _.pick(req.body,['email','password']);
-    var user = new User(body);
+app.post('/users', async (req, res) => {
+    // //console.log(req.body);
+    // var body = _.pick(req.body,['email','password']);
+    // var user = new User(body);
+    //
+    // user.save().then(() => {
+    //     return user.generateAuthToken();
+    //     //res.send(user);
+    // }).then((token)=>{
+    //     res.header('x-auth',token).send(user);
+    // }).catch((e) => {
+    //     res.status(400).send(e);
+    // });
 
-    user.save().then(() => {
-        return user.generateAuthToken();
-        //res.send(user);
-    }).then((token)=>{
-        res.header('x-auth',token).send(user);
-    }).catch((e) => {
+    const body = _.pick(req.body, ['email', 'password']);
+    const user = new User(body);
+    try {
+        await user.save();
+        const token = user.generateAuthToken();
+        res.header('x-auth', token).send(user);
+    } catch (e) {
         res.status(400).send(e);
-    });
+    }
+
 });
 
-app.get('/users/me', authenticate, (req,res)=>{
+app.get('/users/me', authenticate, (req, res) => {
     res.send(req.user);
 });
 
 
 //POST /users/login [email,password}
-app.post('/users/login', (req,res) => {
-    var body = _.pick(req.body,['email','password']);
+app.post('/users/login', async (req, res) => {
+    // var body = _.pick(req.body,['email','password']);
+    //
+    // User.findByCredentials(body.email,body.password).then((user) => {
+    //     //res.send(user);
+    //     return user.generateAuthToken().then((token)=> {
+    //         res.header('x-auth', token).send(user);
+    //     });
+    // }).catch((e) => {
+    //     res.status(400).send(e);
+    // });
 
-    User.findByCredentials(body.email,body.password).then((user) => {
-        //res.send(user);
-        return user.generateAuthToken().then((token)=> {
-            res.header('x-auth', token).send(user);
-        });
-    }).catch((e) => {
+    try {
+        const body = _.pick(req.body, ['email', 'password']);
+        const user = await User.findByCredentials(body.email, body.password);
+        const token = await user.generateAuthToken();
+        res.header('x-auth', token).send(user);
+    } catch (e) {
         res.status(400).send(e);
-    });
-
+    }
 });
 
-app.delete('/users/me/token', authenticate, (req,res)=>{
-    req.user.removeToken(req.token).then(()=>{
+app.delete('/users/me/token', authenticate, async (req, res) => {
+    // req.user.removeToken(req.token).then(()=>{
+    //     res.status(200).send();
+    // },()=>{
+    //     res.status(400).send();
+    // });
+
+    try {
+        await req.user.removeToken(req.token);
         res.status(200).send();
-    },()=>{
+    } catch (e) {
         res.status(400).send();
-    });
+    }
+
 });
 
 
-app.listen(port,() => {
+app.listen(port, () => {
     console.log(`Started on port ${port}`);
 })
 
@@ -199,7 +247,6 @@ app.listen(port,() => {
 // });
 
 
-
 // // User
 // var user = new User({
 //   email:'   bruno@example.com    '
@@ -211,4 +258,4 @@ app.listen(port,() => {
 // });
 
 
-module.exports={app};
+module.exports = {app};
